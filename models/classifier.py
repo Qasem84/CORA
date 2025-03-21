@@ -71,16 +71,31 @@ class Classifier(torch.nn.Module):
             self.positional_embedding = nn.Parameter(torch.empty(self.context_length, transformer_width))
             self.ln_final = LayerNorm(transformer_width)
             self.text_projection = nn.Parameter(torch.empty(transformer_width, embed_dim))
-            
+            for param in self.parameters():
+                param.requires_grad = False
             # load 
             self.transformer.load_state_dict({k.replace('transformer.', ''): v for k, v in state_dict.items() if k.startswith('transformer.')})
             self.token_embedding.load_state_dict({k.replace('token_embedding.', ''): v for k, v in state_dict.items() if 'token_embedding' in k})
             self.ln_final.load_state_dict({k.replace('ln_final.', ''): v for k, v in state_dict.items() if 'ln_final' in k})
             self.positional_embedding.data = state_dict['positional_embedding']
             self.text_projection.data = state_dict['text_projection']
+            trainable_names = [
             
-            for v in self.parameters():
-                v.requires_grad_(False)
+            'transformer.resblocks.11.attn.q_proj.weight', 'transformer.resblocks.11.attn.q_proj.bias',
+            'transformer.resblocks.11.attn.k_proj.weight', 'transformer.resblocks.11.attn.k_proj.bias',
+            'transformer.resblocks.11.attn.v_proj.weight', 'transformer.resblocks.11.attn.v_proj.bias',
+            'transformer.resblocks.10.attn.q_proj.weight', 'transformer.resblocks.10.attn.q_proj.bias',
+            'transformer.resblocks.10.attn.k_proj.weight', 'transformer.resblocks.10.attn.k_proj.bias',
+            'transformer.resblocks.10.attn.v_proj.weight', 'transformer.resblocks.10.attn.v_proj.bias',
+
+        ]
+            
+            for name, param in self.named_parameters():
+                if any(t in name for t in trainable_names):
+                    param.requires_grad = True
+            
+            
+              
             
         else:
             raise NotImplementedError
