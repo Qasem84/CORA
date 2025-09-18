@@ -314,7 +314,7 @@ def main(args):
         if not args.eval and 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint:
             #optimizer.load_state_dict(checkpoint['optimizer'])
             lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
-            args.start_epoch = checkpoint['epoch'] + 1
+            args.start_epoch = 0
         if 'best_performance' in checkpoint:
             best_performance = checkpoint['best_performance']
         if 'model_ema'in checkpoint and model_ema is not None:
