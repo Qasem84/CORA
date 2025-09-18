@@ -165,29 +165,19 @@ class Backbone(BackboneBase):
                     region_prompt = torch.load(region_prompt_path, map_location='cpu')
                     new_state_dict.update(region_prompt)
                 backbone.load_state_dict(new_state_dict)
-                trainable_names = [
-                'attnpool.q_proj.weight', 'attnpool.q_proj.bias',
-                'attnpool.k_proj.weight', 'attnpool.k_proj.bias',
-                'attnpool.v_proj.weight', 'attnpool.v_proj.bias'  # Include full layer prefixes
-                ]
-                for name, param in backbone.named_parameters():
-                    if any(t in name for t in trainable_names):
-                        param.requires_grad = True
-                    else:
-                        param.requires_grad = False 
-            else:
-                if name == 'clip_RN50' and no_clip_init:
-                    name = 'resnet50'
-                backbone = getattr(torchvision.models, name)(
+        else:
+            if name == 'clip_RN50' and no_clip_init:
+                name = 'resnet50'
+            backbone = getattr(torchvision.models, name)(
                 replace_stride_with_dilation=[False, False, dilation],
                 pretrained=is_main_process(), norm_layer=FrozenBatchNorm2d)
-                assert name not in ('resnet18', 'resnet34'), "Number of channels are hard coded, thus do not support res18/34."
-                num_channels = 512 if name in ('resnet18', 'resnet34') else 2048
-            super().__init__(backbone, train_backbone, num_channels, return_interm_layers, feature_layer)
-            self.attn_pool = backbone.attnpool
-            if feature_layer in ['layer3', 'layer34', 'layer23', 'layer234', 'layer4']:
+            assert name not in ('resnet18', 'resnet34'), "Number of channels are hard coded, thus do not support res18/34."
+            num_channels = 512 if name in ('resnet18', 'resnet34') else 2048
+        super().__init__(backbone, train_backbone, num_channels, return_interm_layers, feature_layer)
+        self.attn_pool = backbone.attnpool
+        if feature_layer in ['layer3', 'layer34', 'layer23', 'layer234', 'layer4']:
             # assume that we apply layer4 on roi feature
-                self.layer4 = backbone.layer4
+            self.layer4 = backbone.layer4
 
 
 class Joiner(nn.Sequential):
