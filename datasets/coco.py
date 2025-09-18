@@ -16,9 +16,10 @@ import torch.utils.data
 import torchvision
 from pycocotools import mask as coco_mask
 from util import box_ops
-
+from datasets.transforms import IRContrastEnhance ,ResizeWrapper # new
 import datasets.transforms as T
-
+import cv2
+import torchvision.transforms as TT
 
 class CocoDetection(torchvision.datasets.CocoDetection):
     def __init__(self, img_folder, ann_file, transforms, return_masks, tag_annotation, pseudo_box):
@@ -45,35 +46,35 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self.prepare = ConvertCocoPolysToMask(return_masks, map=self.catid2label)
 
     def __getitem__(self, idx):
-        img, target = super(CocoDetection, self).__getitem__(idx)
-        image_id = self.ids[idx]
+          img, target = super(CocoDetection, self).__getitem__(idx)
+          image_id = self.ids[idx]
 
-        if self.use_pseudo_box:
-            pseudo_annotations = self.pseudo_annotations[image_id] if image_id in self.pseudo_annotations else []
-            target.extend(pseudo_annotations)
+          if self.use_pseudo_box:
+              pseudo_annotations = self.pseudo_annotations[image_id] if image_id in self.pseudo_annotations else []
+              target.extend(pseudo_annotations)
 
-        target = {'image_id': image_id, 'annotations': target}
-        img, target = self.prepare(img, target)
-        if self._transforms is not None:
-            img, target = self._transforms(img, target)
+          target = {'image_id': image_id, 'annotations': target}
+          img, target = self.prepare(img, target)
+          if self._transforms is not None:
+              img, target = self._transforms(img, target)
 
-        if self.use_pseudo_box:
-            # recover the pseudo boxes
-            target['pseudo_labels'] = [target['pseudo_label_map'][i] for i in target['labels'].tolist() if i < 0]
-            target.pop('pseudo_label_map')
-            target['labels'] = target['labels'][target['labels'] >= 0]
-            num_gt_boxes = target['labels'].size(0)
-            gt_boxes = target['boxes'][:num_gt_boxes]
-            pseudo_boxes = target['boxes'][num_gt_boxes:]
-            iou = box_ops.box_iou(box_ops.box_cxcywh_to_xyxy(pseudo_boxes), box_ops.box_cxcywh_to_xyxy(gt_boxes))[0]
-            valid = (iou < 0.5).all(-1).nonzero()[:,0]
-            target['boxes'] = torch.cat([gt_boxes, pseudo_boxes[valid]], dim=0)
-            target['pseudo_labels'] = [target['pseudo_labels'][i] for i in valid.tolist()]
+          if self.use_pseudo_box:
+              # recover the pseudo boxes
+              target['pseudo_labels'] = [target['pseudo_label_map'][i] for i in target['labels'].tolist() if i < 0]
+              target.pop('pseudo_label_map')
+              target['labels'] = target['labels'][target['labels'] >= 0]
+              num_gt_boxes = target['labels'].size(0)
+              gt_boxes = target['boxes'][:num_gt_boxes]
+              pseudo_boxes = target['boxes'][num_gt_boxes:]
+              iou = box_ops.box_iou(box_ops.box_cxcywh_to_xyxy(pseudo_boxes), box_ops.box_cxcywh_to_xyxy(gt_boxes))[0]
+              valid = (iou < 0.5).all(-1).nonzero()[:,0]
+              target['boxes'] = torch.cat([gt_boxes, pseudo_boxes[valid]], dim=0)
+              target['pseudo_labels'] = [target['pseudo_labels'][i] for i in valid.tolist()]
 
-        if self.image_tags is not None:
-            target['class_labels'] = self.image_tags[str(image_id)]
+          if self.image_tags is not None:
+              target['class_labels'] = self.image_tags[str(image_id)]
 
-        return img, target
+          return img, target
 
 
 def convert_coco_poly_to_mask(segmentations, height, width):
@@ -191,25 +192,28 @@ def make_coco_transforms(image_set, args):
             normalize,
         ])
 
-    scales = [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
+    scales = [224]
 
     if image_set == 'train':
         return T.Compose([
-            T.RandomHorizontalFlip(),
-            T.RandomSelect(
-                T.RandomResize(scales, max_size=1333),
-                T.Compose([
-                    T.RandomResize([400, 500, 600]),
-                    T.RandomSizeCrop(384, 600),
-                    T.RandomResize(scales, max_size=1333),
-                ])
-            ),
-            normalize,
-        ])
+            T.RandomResize([224]),
+            normalize,])
+
+        #return T.Compose([
+            #T.RandomHorizontalFlip(),
+            #T.RandomSelect(
+                #T.RandomResize(scales),
+                #T.Compose([
+                    #T.RandomResize([224]),
+                    #T.RandomSizeCrop(384, 600),
+                                    #])
+            #),
+            #normalize,
+        #])
 
     if image_set == 'val':
         return T.Compose([
-            T.RandomResize([800], max_size=1333),
+            T.RandomResize([1333]),
             normalize,
         ])
 
